@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>보험 포트폴리오 분석 — 뱅크샐러드</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #00C896; --green-light: #E6FAF5; --green-dark: #009970;
+  --red: #FF4D4D; --red-light: #FFF0F0;
+  --gray-100: #F1F3F5; --gray-200: #E9ECEF; --gray-400: #ADB5BD;
+  --gray-600: #6C757D; --gray-800: #343A40; --gray-900: #212529;
+  --amber: #FF9500; --amber-light: #FFF5E6;
+  --blue: #3A7BD5; --blue-light: #EEF3FC;
+  --radius: 16px;
+}
+
+body {
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  background: #F0F2F5;
+  color: var(--gray-900);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* 앱 컨테이너 */
+.app {
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #F0F2F5;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 상단 바 */
+.topbar {
+  background: #fff;
+  border-bottom: 0.5px solid var(--gray-200);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.topbar-logo { font-size: 17px; font-weight: 700; color: var(--green); }
+.topbar-divider { width: 1px; height: 14px; background: var(--gray-200); }
+.topbar-title { font-size: 13px; color: var(--gray-600); font-weight: 500; }
+
+/* 스텝 바 */
+.stepbar {
+  display: flex;
+  gap: 5px;
+  padding: 12px 20px 0;
+  flex-shrink: 0;
+}
+.stepdot {
+  flex: 1; height: 3px; border-radius: 2px;
+  background: var(--gray-200); transition: background 0.4s;
+}
+.stepdot.on { background: var(--green); }
+
+/* 화면 영역 */
+.screens {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  padding: 0 20px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(30px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  z-index: 1;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  z-index: 2;
+}
+.screen.exit {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-30px);
+  z-index: 1;
+}
+
+/* 하단 버튼 고정 */
+.bottom {
+  padding: 12px 20px 28px;
+  background: #F0F2F5;
+  flex-shrink: 0;
+}
+
+/* 공통 컴포넌트 */
+.eyebrow {
+  font-size: 11px; font-weight: 600; color: var(--green);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  margin-top: 24px; margin-bottom: 8px;
+}
+.title {
+  font-size: 24px; font-weight: 700; line-height: 1.35;
+  color: var(--gray-900); margin-bottom: 6px;
+}
+.sub {
+  font-size: 14px; color: var(--gray-600); line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.btn {
+  width: 100%; padding: 16px;
+  border: none; border-radius: 12px;
+  font-size: 16px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.2s;
+}
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { background: var(--green-dark); }
+.btn-green:disabled { opacity: 0.4; pointer-events: none; }
+
+/* 상황 선택 버튼 */
+.sit-btn {
+  width: 100%; background: #fff; border: 1.5px solid var(--gray-200);
+  border-radius: 14px; padding: 16px;
+  display: flex; align-items: center; gap: 14px;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.2s; margin-bottom: 10px; text-align: left;
+}
+.sit-btn.selected { border-color: var(--green); background: var(--green-light); }
+.sit-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.sit-title { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.sit-sub { font-size: 12px; color: var(--gray-600); }
+
+/* 스캔 화면 */
+.scan-item {
+  background: #fff; border-radius: 12px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 8px; border: 0.5px solid var(--gray-200);
+  opacity: 0; transform: translateY(8px);
+  transition: all 0.4s ease;
+}
+.scan-item.show { opacity: 1; transform: translateY(0); }
+.scan-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.scan-name { font-size: 14px; font-weight: 600; }
+.scan-detail { font-size: 12px; color: var(--gray-600); margin-top: 2px; }
+.scan-check {
+  margin-left: auto; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff; flex-shrink: 0;
+  background: var(--gray-200); transition: background 0.3s;
+}
+.scan-check.done { background: var(--green); }
+
+/* 보장 분석 바 */
+.bar-wrap { margin-bottom: 14px; }
+.bar-label {
+  display: flex; justify-content: space-between;
+  font-size: 12px; font-weight: 600; margin-bottom: 6px;
+}
+.bar {
+  height: 28px; border-radius: 10px; overflow: hidden;
+  display: flex; gap: 3px;
+}
+.bar-seg {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: #fff;
+  border-radius: 10px; transition: all 0.6s ease;
+}
+
+/* 보장 항목 */
+.cov-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 0.5px solid var(--gray-100);
+}
+.cov-icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.cov-ok { background: var(--gray-100); color: var(--gray-600); }
+.cov-lost { background: #FBDFDE; color: #EB5E59; }
+.cov-gap { background: var(--gray-100); color: var(--gray-400); }
+.cov-text { font-size: 14px; flex: 1; }
+.cov-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  border-radius: 6px; flex-shrink: 0;
+}
+
+/* 토글 */
+.toggle {
+  display: flex; background: var(--gray-100); border-radius: 10px;
+  padding: 3px; gap: 3px; margin-bottom: 16px;
+}
+.toggle-btn {
+  flex: 1; padding: 8px; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; background: transparent; color: var(--gray-600);
+  transition: all 0.2s;
+}
+.toggle-btn.on { background: #fff; color: var(--gray-900); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+/* 문제 카드 */
+.problem-card {
+  border-radius: 14px; padding: 16px;
+  display: flex; gap: 12px; align-items: flex-start;
+  margin-bottom: 10px;
+}
+.problem-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+
+/* 플랜 카드 */
+.plan-card {
+  background: #fff; border: 1.5px solid var(--gray-200);
+  border-radius: 16px; padding: 18px; cursor: pointer;
+  transition: all 0.2s; margin-bottom: 10px;
+}
+.plan-card.selected { border-color: var(--green); background: var(--green-light); }
+.plan-tag {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+}
+.plan-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.plan-sub { font-size: 13px; color: var(--gray-600); margin-bottom: 12px; }
+.plan-chip {
+  font-size: 12px; font-weight: 600; padding: 4px 10px;
+  border-radius: 8px; display: inline-block; margin-right: 6px;
+}
+
+/* 리포트 카드 */
+.report-card {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #86efac; border-radius: 18px; padding: 20px;
+  margin-top: 16px;
+}
+.report-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin: 14px 0;
+}
+.report-cell {
+  background: #fff; border-radius: 12px; padding: 12px;
+  text-align: center;
+}
+.report-label { font-size: 11px; color: var(--gray-500); margin-bottom: 4px; }
+.report-val { font-size: 17px; font-weight: 700; }
+.report-savings {
+  background: #fff; border-radius: 12px; padding: 14px;
+  display: flex; justify-content: space-around;
+}
+.saving-item { text-align: center; }
+.saving-label { font-size: 10px; color: var(--gray-500); margin-bottom: 3px; }
+.saving-val { font-size: 16px; font-weight: 700; color: var(--green-dark); }
+.report-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.action-item {
+  font-size: 13px; color: var(--gray-800);
+  padding: 10px 12px; background: #fff;
+  border-radius: 10px;
+}
+
+/* 알럿 */
+.alert {
+  border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13px; line-height: 1.5; margin-top: 10px;
+}
+.alert-amber { background: var(--amber-light); color: #7A4500; }
+.alert-red { background: var(--red-light); color: #A30000; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 상단 바 -->
+  <div class="topbar">
+    <div class="topbar-logo">뱅크샐러드</div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-title">보험 포트폴리오 분석</div>
+  </div>
+
+  <!-- 스텝 바 -->
+  <div class="stepbar">
+    <div class="stepdot on" id="d0"></div>
+    <div class="stepdot" id="d1"></div>
+    <div class="stepdot" id="d2"></div>
+    <div class="stepdot" id="d3"></div>
+    <div class="stepdot" id="d4"></div>
+    <div class="stepdot" id="d5"></div>
+    <div class="stepdot" id="d6"></div>
+  </div>
+
+  <!-- 화면들 -->
+  <div class="screens">
+
+    <!-- S0: 카톡방 인트로 -->
+    <div class="screen active" id="s0">
+      <!-- 카톡방 헤더 -->
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 0 10px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏦</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">뱅크샐러드 보험 분석</div>
+          <div style="font-size:11px;color:var(--gray-400);">공식 채널</div>
+        </div>
+      </div>
+
+      <div style="border-top:0.5px solid var(--gray-200);padding-top:16px;display:flex;flex-direction:column;gap:12px;">
+
+        <!-- 날짜 -->
+        <div style="text-align:center;font-size:11px;color:var(--gray-400);">오늘</div>
+
+        <!-- 봇 메시지 1 -->
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🏦</div>
+          <div style="max-width:80%;">
+            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;">뱅크샐러드</div>
+            <div style="background:#fff;border-radius:0 12px 12px 12px;padding:12px 14px;font-size:14px;line-height:1.6;color:var(--gray-900);border:0.5px solid var(--gray-200);">
+              안녕하세요! 👋<br>뱅크샐러드 보험 분석 서비스예요.
+            </div>
+          </div>
+        </div>
+
+        <!-- 봇 메시지 2 (딜레이 느낌) -->
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🏦</div>
+          <div style="max-width:80%;">
+            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;">뱅크샐러드</div>
+            <div style="background:#fff;border-radius:0 12px 12px 12px;padding:12px 14px;font-size:14px;line-height:1.6;color:var(--gray-900);border:0.5px solid var(--gray-200);">
+              마이데이터 기반으로 지금 보험 구조를 분석해드릴게요.<br><br>
+              <strong>이직·퇴사</strong>를 앞두고 있다면 단체보험이 사라지기 전에 꼭 확인해보세요! 💡
+            </div>
+          </div>
+        </div>
+
+        <!-- 봇 메시지 3: 버튼 -->
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🏦</div>
+          <div style="max-width:80%;">
+            <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px;">뱅크샐러드</div>
+            <div style="background:#fff;border-radius:0 12px 12px 12px;padding:12px 14px;font-size:14px;line-height:1.6;color:var(--gray-900);border:0.5px solid var(--gray-200);">
+              아래 버튼을 눌러 분석을 시작해보세요 👇
+            </div>
+          </div>
+        </div>
+
+        <!-- 분석 시작 버튼 (카톡 스타일) -->
+        <div style="margin-left:40px;">
+          <button onclick="goToScreen(1)" style="background:#FEE500;border:none;border-radius:12px;padding:14px 20px;font-size:15px;font-weight:700;color:#3A1D1D;cursor:pointer;font-family:inherit;width:100%;text-align:center;">
+            🔍 보험 분석 시작하기
+          </button>
+        </div>
+
+        <!-- 안내 텍스트 -->
+        <div style="text-align:center;font-size:11px;color:var(--gray-400);margin-top:4px;">
+          마이데이터 연동 완료 · 분석에 약 2분 소요돼요
+        </div>
+      </div>
+    </div>
+
+    <!-- S1: 상황 선택 -->
+    <div class="screen" id="s1">
+      <div class="eyebrow">Step 1</div>
+      <div class="title">이직이나 퇴사를<br>계획하고 계신가요?</div>
+      <div class="sub">상황에 맞는 보장 분석을 시작합니다</div>
+
+      <button class="sit-btn" id="btn-plan-yes" onclick="selectSit('이직', this)">
+        <div class="sit-icon" style="background:#FFF5E6;">📋</div>
+        <div>
+          <div class="sit-title">이직 / 퇴사 계획 있음</div>
+          <div class="sit-sub">퇴사 예정이거나 이직을 준비 중이에요</div>
+        </div>
+      </button>
+      <button class="sit-btn" id="btn-plan-no" onclick="selectSit('재직', this)">
+        <div class="sit-icon" style="background:var(--gray-100);">🔍</div>
+        <div>
+          <div class="sit-title">계획 없음 (보험 정리만)</div>
+          <div class="sit-sub">중복이나 낭비가 있는지 확인하고 싶어요</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- S2: 마이데이터 스캔 -->
+    <div class="screen" id="s2">
+      <div class="eyebrow">Step 2</div>
+      <div class="title">마이데이터에서<br>보험을 불러오는 중이에요</div>
+      <div class="sub">연동된 보험 3개를 확인했어요</div>
+
+      <div id="scan-list">
+        <div class="scan-item" id="si1">
+          <div class="scan-icon" style="background:#EEF7FF;">🏢</div>
+          <div>
+            <div class="scan-name">삼성생명 단체보장보험</div>
+            <div class="scan-detail">입원의료비 · 수술비 · 사망 · 후유장해</div>
+          </div>
+          <div class="scan-check" id="sc1">✓</div>
+        </div>
+        <div class="scan-item" id="si2">
+          <div class="scan-icon" style="background:#FFF0F0;">📋</div>
+          <div>
+            <div class="scan-name">KB손보 실손보험</div>
+            <div class="scan-detail">2세대 · 부모님 계약 · 갱신형</div>
+          </div>
+          <div class="scan-check" id="sc2">✓</div>
+        </div>
+        <div class="scan-item" id="si3">
+          <div class="scan-icon" style="background:#F0FFF8;">💚</div>
+          <div>
+            <div class="scan-name">한화생명 건강보험</div>
+            <div class="scan-detail">입원의료비 · 암진단비 · 수술비</div>
+          </div>
+          <div class="scan-check" id="sc3">✓</div>
+        </div>
+      </div>
+      <div id="scan-complete" style="display:none;margin-top:14px;" class="alert alert-amber">
+        <span>⚠️</span>
+        <span id="scan-alert-text">연동 완료! 보장 분석을 시작할게요.</span>
+      </div>
+    </div>
+
+    <!-- S3: 보장 분석 -->
+    <div class="screen" id="s3">
+      <div style="margin-top:16px;"></div>
+
+      <!-- 토글 + 바 카드 -->
+      <div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--gray-200);">
+        <div class="toggle" id="s3-toggle" style="margin-bottom:14px;">
+          <button class="toggle-btn on" onclick="setBarMode('before')">현재</button>
+          <button class="toggle-btn" onclick="setBarMode('after')" style="white-space:nowrap;">이직/퇴사 후</button>
+        </div>
+
+        <!-- 내 돈 바 -->
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;">
+            <span style="color:var(--gray-600);">내 돈 (개인보험)</span>
+            <span>150,000원 / 월</span>
+          </div>
+          <div style="display:flex;height:32px;border-radius:10px;overflow:hidden;gap:3px;">
+            <div style="flex:72;background:#B4B2A9;display:flex;align-items:center;padding-left:10px;">
+              <span style="font-size:11px;font-weight:600;color:#fff;">유효 보장</span>
+            </div>
+            <div style="flex:28;background:#FF4D4D;display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:11px;font-weight:600;color:#fff;">낭비 28%</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px;">
+            <span style="color:var(--gray-600);">유효 보장 108,000원</span>
+            <span style="color:#A30000;">중복 낭비 42,000원</span>
+          </div>
+        </div>
+
+        <!-- 회사 돈 바 -->
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;">
+            <span style="color:#3A7BD5;">회사 돈 (단체보험)</span>
+            <span style="color:#3A7BD5;">회사 부담</span>
+          </div>
+          <div id="company-bar" style="height:32px;border-radius:10px;background:#3A7BD5;display:flex;align-items:center;padding-left:10px;transition:all 0.5s;">
+            <span id="company-label" style="font-size:11px;font-weight:600;color:#fff;">사망 · 수술 · 뇌심장 보장</span>
+          </div>
+          <div id="company-sub" style="font-size:11px;color:#3A7BD5;margin-top:4px;">이직/퇴사 시 즉시 소멸 (회사가 납입)</div>
+        </div>
+
+        <!-- 이직 후 알럿 -->
+        <div id="s3-alert" style="display:none;margin-top:12px;background:#FFF5E6;border-radius:10px;padding:12px;font-size:13px;color:#7A4500;line-height:1.6;">
+          ⚠️ 단체보험 소멸로 <strong>사망·후유장해·뇌심장 보장이 공백</strong>이 됩니다.
+        </div>
+      </div>
+
+      <!-- 낭비 강조 박스 -->
+      <div style="background:#FFF5F5;border:1px solid #F09595;border-radius:14px;padding:16px;margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:600;color:#A30000;margin-bottom:6px;">입원의료비 3중 중복 낭비</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px;">
+          <span style="font-size:26px;font-weight:700;color:#E24B4A;">42,000원</span>
+          <span style="font-size:13px;color:#A30000;">/ 월</span>
+        </div>
+        <div style="display:flex;gap:20px;">
+          <div><div style="font-size:11px;color:#A30000;margin-bottom:2px;">연간</div><div style="font-size:15px;font-weight:700;color:#A32D2D;">504,000원</div></div>
+          <div style="width:0.5px;background:#F09595;"></div>
+          <div><div style="font-size:11px;color:#A30000;margin-bottom:2px;">3년 누적</div><div style="font-size:15px;font-weight:700;color:#A32D2D;">1,512,000원</div></div>
+        </div>
+      </div>
+
+      <!-- 보장 항목 -->
+      <div style="background:#fff;border-radius:14px;padding:16px;border:0.5px solid var(--gray-200);margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--gray-400);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.8px;">보장 항목별 출처</div>
+        <div class="cov-item">
+          <span class="cov-icon cov-ok">✓</span>
+          <span class="cov-text">입원 의료비</span>
+          <span class="cov-badge" style="background:var(--gray-100);color:var(--gray-600);">개인보험</span>
+        </div>
+        <div class="cov-item">
+          <span class="cov-icon cov-ok">✓</span>
+          <span class="cov-text">통원 의료비</span>
+          <span class="cov-badge" style="background:var(--gray-100);color:var(--gray-600);">개인보험</span>
+        </div>
+        <div class="cov-item">
+          <span class="cov-icon cov-ok">✓</span>
+          <span class="cov-text">수술비</span>
+          <span class="cov-badge" style="background:#3A7BD5;color:#fff;">단체+개인</span>
+        </div>
+        <div class="cov-item">
+          <span class="cov-icon cov-ok">✓</span>
+          <span class="cov-text">암 진단비</span>
+          <span class="cov-badge" style="background:var(--gray-100);color:var(--gray-600);">개인보험</span>
+        </div>
+        <div class="cov-item">
+          <span class="cov-icon cov-ok" id="ci-death">✓</span>
+          <span class="cov-text" id="ct-death">사망 / 후유장해</span>
+          <span class="cov-badge" id="cb-death" style="background:#3A7BD5;color:#fff;">회사 부담</span>
+        </div>
+        <div class="cov-item" style="border-bottom:none;">
+          <span class="cov-icon cov-ok" id="ci-brain">✓</span>
+          <span class="cov-text" id="ct-brain">뇌 / 심장 진단비</span>
+          <span class="cov-badge" id="cb-brain" style="background:#3A7BD5;color:#fff;">회사 부담</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- S4: 문제 설명 -->
+    <div class="screen" id="s4">
+      <div class="eyebrow">Step 4</div>
+      <div class="title">분석 결과<br>두 가지 문제가 있어요</div>
+      <div class="sub">각 문제를 확인하고 어떻게 할지 결정해보세요</div>
+
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
+        <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:#FFF5F5;color:#A30000;font-weight:600;">💸 중복 낭비 42,000원/월</span>
+        <span id="gap-chip" style="font-size:12px;padding:4px 10px;border-radius:20px;background:#FBDFDE;color:#A30000;font-weight:600;">⚠️ 이직 후 보장 공백</span>
+        <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:#EEF3FC;color:#1A3F7A;font-weight:600;">🔒 KB손보 실손 유지</span>
+      </div>
+
+      <div class="problem-card" style="background:#FFF5F5;border:0.5px solid #F09595;">
+        <div class="problem-icon" style="background:#FF4D4D;">💸</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;">지금 당장 — 중복 낭비</div>
+          <div style="font-size:13px;color:var(--gray-700);line-height:1.6;">입원의료비가 3중으로 겹쳐서<br>매달 <strong style="color:#A30000;">42,000원</strong>이 낭비되고 있어요</div>
+        </div>
+      </div>
+
+      <div class="problem-card" id="gap-card" style="background:#FBDFDE;border:0.5px solid #EB5E59;">
+        <div class="problem-icon" style="background:#EB5E59;">⚠️</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;">이직 후 — 보장 공백</div>
+          <div style="font-size:13px;color:var(--gray-700);line-height:1.6;">단체보험이 소멸되면<br><strong style="color:#A30000;">사망·뇌심장 보장</strong>이 사라져요</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S5: 플랜 선택 -->
+    <div class="screen" id="s5">
+      <div class="eyebrow">Step 5</div>
+      <div class="title">어떻게<br>해결하고 싶으세요?</div>
+      <div class="sub">직접 선택하면 내 플랜이 완성돼요</div>
+
+      <div class="plan-card" id="pc-full" onclick="selectPlan('full')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <span class="plan-tag" style="background:var(--green);color:#fff;">추천</span>
+          <div id="ck-full" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--gray-300);flex-shrink:0;"></div>
+        </div>
+        <div class="plan-title">두 문제 동시에 해결</div>
+        <div class="plan-sub">낭비 제거 + 이직 후 공백 보완까지</div>
+        <div>
+          <span class="plan-chip" style="background:var(--green-light);color:var(--green-dark);">월 -27,000원</span>
+          <span class="plan-chip" style="background:var(--green-light);color:var(--green-dark);">보장 확대</span>
+        </div>
+      </div>
+
+      <div class="plan-card" id="pc-waste" onclick="selectPlan('waste')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <span class="plan-tag" style="background:var(--gray-200);color:var(--gray-600);">대안</span>
+          <div id="ck-waste" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--gray-300);flex-shrink:0;"></div>
+        </div>
+        <div class="plan-title">일단 낭비만 제거</div>
+        <div class="plan-sub">지금 낭비만 없애고, 공백은 이직 후에</div>
+        <div>
+          <span class="plan-chip" style="background:var(--green-light);color:var(--green-dark);">월 -42,000원</span>
+          <span class="plan-chip" style="background:var(--gray-100);color:var(--gray-600);">공백은 나중에</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- S6: WOW 리포트 -->
+    <div class="screen" id="s6">
+
+      <!-- 헤더 -->
+      <div style="text-align:center;padding:28px 0 16px;">
+        <div style="font-size:48px;margin-bottom:10px;" id="wow-emoji">🎉</div>
+        <div style="font-size:22px;font-weight:700;line-height:1.4;" id="wow-title">월 27,000원 절약하면서<br>보장이 더 넓어졌어요</div>
+        <div style="font-size:14px;color:var(--gray-600);margin-top:8px;">3년이면 <strong style="color:var(--green);" id="wow-3yr-text">97만원</strong>을 아낍니다</div>
+      </div>
+
+      <!-- 숫자 카드 -->
+      <div style="background:#fff;border-radius:14px;padding:16px;border:0.5px solid var(--gray-200);margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="background:#F8FFF8;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:var(--green);">-<span id="c-monthly">0</span>원</div>
+            <div style="font-size:11px;color:var(--gray-600);margin-top:4px;">월 절약액</div>
+          </div>
+          <div style="background:#F8FFF8;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:var(--green);"><span id="c-yearly">0</span>만원</div>
+            <div style="font-size:11px;color:var(--gray-600);margin-top:4px;">연간 절약액</div>
+          </div>
+          <div style="background:#EEF3FC;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#3A7BD5;"><span id="c-3yr">0</span>만원</div>
+            <div style="font-size:11px;color:var(--gray-600);margin-top:4px;">3년 누적</div>
+          </div>
+          <div style="background:#FFF8EE;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:16px;font-weight:700;color:var(--amber);">동연령<br>상위 12%</div>
+            <div style="font-size:11px;color:var(--gray-600);margin-top:4px;">보장 수준</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 처방 후 보장 바 -->
+      <div style="background:#fff;border-radius:14px;padding:16px;border:0.5px solid var(--gray-200);margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">처방 후 보장 바</div>
+        <div style="font-size:12px;color:var(--gray-600);margin-bottom:4px;">월 보험료</div>
+        <div style="font-size:24px;font-weight:700;color:var(--green-dark);margin-bottom:10px;" id="wow-total">123,000원</div>
+        <div style="display:flex;height:24px;border-radius:10px;overflow:hidden;gap:3px;">
+          <div id="wow-v" style="background:#00C896;width:0%;border-radius:10px;transition:width 1s cubic-bezier(0.34,1.2,0.64,1);"></div>
+          <div id="wow-g" style="background:#E9ECEF;width:0%;border-radius:10px;transition:width 1s cubic-bezier(0.34,1.2,0.64,1);"></div>
+        </div>
+        <div style="background:var(--green-light);border-radius:10px;padding:12px 14px;margin-top:10px;display:flex;gap:8px;align-items:flex-start;font-size:13px;">
+          <span>✅</span>
+          <div id="wow-alert-text"><strong>유효 보장 88%</strong><br>중복 낭비 제거 + 사망 보장 신규 추가</div>
+        </div>
+      </div>
+
+      <!-- MY PLAN REPORT -->
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:14px;padding:16px;margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;color:var(--green-dark);letter-spacing:0.8px;margin-bottom:8px;">MY PLAN REPORT</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:2px;">김지현 고객님의 플랜</div>
+        <div style="font-size:12px;color:var(--gray-600);margin-bottom:12px;" id="report-plan-name">낭비 제거 + 공백 보완</div>
+        <div id="report-actions" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- 다음 할 일 -->
+      <div style="background:#fff;border-radius:14px;padding:16px;border:0.5px solid var(--gray-200);margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">다음 할 일</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button onclick="sendToChat()" style="text-align:left;background:#FEE500;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-family:inherit;cursor:pointer;font-weight:600;color:#3A1D1D;">📨 상담 채팅방에 플랜 전송하기</button>
+          <button style="text-align:left;background:#F8F9FA;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-family:inherit;cursor:pointer;">📄 제거할 특약 정리 방법 보기</button>
+        </div>
+      </div>
+
+      <div style="height:20px;"></div>
+    </div>
+
+  </div><!-- /screens -->
+
+  <!-- 하단 버튼 -->
+  <div class="bottom" id="bottom-bar" style="display:none;">
+    <button class="btn btn-green" id="main-btn" disabled onclick="nextStep()">다음</button>
+  </div>
+
+  <!-- S6 전용 하단 바 -->
+  <div class="bottom" id="bottom-bar-s6" style="display:none;">
+    <button class="btn" onclick="goToScreen(5)" style="background:#fff;color:var(--gray-800);border:1.5px solid var(--gray-200);margin-bottom:8px;">← 다른 플랜도 볼게요</button>
+    <button class="btn btn-green">이 플랜으로 확정하기</button>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+let situation = '이직';
+let currentStep = 0;
+let selectedPlanType = null;
+
+// 스텝 → 화면 ID 매핑
+const stepScreens = { 0:'s0', 1:'s1', 2:'s2', 3:'s3', 4:'s4', 5:'s5', 6:'s6' };
+
+function goToScreen(n) {
+  // 현재 화면 exit
+  const cur = document.getElementById(stepScreens[currentStep]);
+  if (cur) { cur.classList.add('exit'); setTimeout(() => cur.classList.remove('active','exit'), 350); }
+
+  currentStep = n;
+  const next = document.getElementById(stepScreens[n]);
+  if (next) { setTimeout(() => next.classList.add('active'), 50); }
+
+  // 스텝 바 업데이트
+  for (let i = 0; i <= 6; i++) {
+    const d = document.getElementById('d' + i);
+    if (d) d.className = 'stepdot' + (i <= n ? ' on' : '');
+  }
+
+  // 버튼 초기화
+  const btn = document.getElementById('main-btn');
+  btn.disabled = true;
+  btn.textContent = '다음';
+
+  // 화면별 세팅
+  if (n === 2) startScan();
+  if (n === 3) setupS3();
+  if (n === 4) setupS4();
+  if (n === 5) resetPlanSelection();
+  if (n === 6) {
+    document.getElementById('bottom-bar').style.display = 'none';
+    document.getElementById('bottom-bar-s6').style.display = 'block';
+  } else if (n === 0) {
+    document.getElementById('bottom-bar').style.display = 'none';
+    document.getElementById('bottom-bar-s6').style.display = 'none';
+  } else {
+    document.getElementById('bottom-bar').style.display = 'block';
+    document.getElementById('bottom-bar-s6').style.display = 'none';
+  }
+
+  window.scrollTo(0,0);
+  const scr = document.getElementById(stepScreens[n]);
+  if (scr) scr.scrollTop = 0;
+}
+
+function nextStep() {
+  if (currentStep < 6) goToScreen(currentStep + 1);
+}
+
+// S1: 상황 선택
+function selectSit(type, el) {
+  situation = type;
+  document.querySelectorAll('.sit-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  const btn = document.getElementById('main-btn');
+  btn.disabled = false;
+  btn.textContent = '다음';
+
+  // 재직이면 문제카드 gap 숨김
+  const gapCard = document.getElementById('gap-card');
+  const gapChip = document.getElementById('gap-chip');
+  if (gapCard) gapCard.style.display = type === '재직' ? 'none' : 'flex';
+  if (gapChip) gapChip.style.display = type === '재직' ? 'none' : 'inline-block';
+
+  // 이직/퇴사 후 토글 표시여부
+  const toggle = document.getElementById('s3-toggle');
+  if (toggle) toggle.style.display = type === '재직' ? 'none' : 'flex';
+}
+
+// S2: 마이데이터 스캔
+function startScan() {
+  const items = ['si1','si2','si3'];
+  const checks = ['sc1','sc2','sc3'];
+  items.forEach((id,i) => { document.getElementById(id).classList.remove('show'); document.getElementById(checks[i]).classList.remove('done'); });
+  document.getElementById('scan-complete').style.display = 'none';
+  document.getElementById('main-btn').disabled = true;
+
+  items.forEach((id,i) => {
+    setTimeout(() => {
+      document.getElementById(id).classList.add('show');
+      setTimeout(() => {
+        document.getElementById(checks[i]).classList.add('done');
+        if (i === 2) {
+          setTimeout(() => {
+            document.getElementById('scan-complete').style.display = 'flex';
+            document.getElementById('main-btn').disabled = false;
+            document.getElementById('main-btn').textContent = '보장 분석 보기';
+          }, 400);
+        }
+      }, 400);
+    }, i * 600 + 200);
+  });
+}
+
+// S3: 보장 분석
+let barMode = 'before';
+function setupS3() {
+  barMode = 'before';
+  setBarMode('before');
+  const btn = document.getElementById('main-btn');
+  btn.disabled = false;
+  btn.textContent = '문제 확인하기';
+  // 재직이면 토글 숨김
+  document.getElementById('s3-toggle').style.display = situation === '재직' ? 'none' : 'flex';
+}
+
+function setBarMode(mode) {
+  barMode = mode;
+  const isAfter = mode === 'after';
+
+  // 토글 버튼 스타일
+  document.querySelectorAll('#s3-toggle .toggle-btn').forEach((b,i) => {
+    b.className = 'toggle-btn' + ((i===0 && !isAfter) || (i===1 && isAfter) ? ' on' : '');
+  });
+
+  // 단체보험 바
+  const cb = document.getElementById('company-bar');
+  const cl = document.getElementById('company-label');
+  const cs = document.getElementById('company-sub');
+  if (isAfter) {
+    cb.style.background = 'repeating-linear-gradient(45deg,#E9ECEF,#E9ECEF 4px,#F8F9FA 4px,#F8F9FA 8px)';
+    cl.style.color = '#ADB5BD';
+    cl.textContent = '단체보험 소멸 — 이 보장이 사라져요';
+    cs.style.color = '#A30000';
+    cs.textContent = '이직/퇴사 후 즉시 소멸';
+  } else {
+    cb.style.background = '#3A7BD5';
+    cl.style.color = '#fff';
+    cl.textContent = '사망 · 수술 · 뇌심장 보장';
+    cs.style.color = '#3A7BD5';
+    cs.textContent = '이직/퇴사 시 즉시 소멸';
+  }
+
+  // 보장 항목
+  const ciDeath = document.getElementById('ci-death');
+  const ctDeath = document.getElementById('ct-death');
+  const cbDeath = document.getElementById('cb-death');
+  const ciBrain = document.getElementById('ci-brain');
+  const ctBrain = document.getElementById('ct-brain');
+  const cbBrain = document.getElementById('cb-brain');
+
+  if (isAfter) {
+    ciDeath.className = 'cov-icon cov-lost'; ciDeath.textContent = '✕';
+    ctDeath.style.color = '#EB5E59';
+    cbDeath.style.cssText = 'background:#FBDFDE;color:#EB5E59;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;flex-shrink:0;';
+    cbDeath.textContent = '신규 공백';
+    ciBrain.className = 'cov-icon cov-lost'; ciBrain.textContent = '✕';
+    ctBrain.style.color = '#EB5E59';
+    cbBrain.style.cssText = 'background:#FBDFDE;color:#EB5E59;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;flex-shrink:0;';
+    cbBrain.textContent = '신규 공백';
+    document.getElementById('s3-alert').style.display = 'flex';
+  } else {
+    ciDeath.className = 'cov-icon cov-ok'; ciDeath.textContent = '✓';
+    ctDeath.style.color = '';
+    cbDeath.style.cssText = 'background:#3A7BD5;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;flex-shrink:0;';
+    cbDeath.textContent = '회사 부담';
+    ciBrain.className = 'cov-icon cov-ok'; ciBrain.textContent = '✓';
+    ctBrain.style.color = '';
+    cbBrain.style.cssText = 'background:#3A7BD5;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;flex-shrink:0;';
+    cbBrain.textContent = '회사 부담';
+    document.getElementById('s3-alert').style.display = 'none';
+  }
+}
+
+// S4: 문제 설명
+function setupS4() {
+  const btn = document.getElementById('main-btn');
+  btn.disabled = false;
+  btn.textContent = situation === '재직' ? '낭비 해결하기' : '플랜 결정하기';
+  // 재직이면 gap 숨김
+  const gapCard = document.getElementById('gap-card');
+  if (gapCard) gapCard.style.display = situation === '재직' ? 'none' : 'flex';
+}
+
+// S5: 플랜 선택
+function resetPlanSelection() {
+  ['full','waste'].forEach(t => {
+    const card = document.getElementById('pc-' + t);
+    const chk = document.getElementById('ck-' + t);
+    if (card) { card.classList.remove('selected'); }
+    if (chk) { chk.style.cssText = 'width:22px;height:22px;border-radius:50%;border:1.5px solid var(--gray-300);flex-shrink:0;'; chk.textContent = ''; }
+  });
+  // 포인터 이벤트 복원
+  ['pc-full','pc-waste'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.pointerEvents = 'auto';
+  });
+}
+
+function selectPlan(type) {
+  selectedPlanType = type;
+
+  ['full','waste'].forEach(t => {
+    const card = document.getElementById('pc-' + t);
+    const chk = document.getElementById('ck-' + t);
+    if (t === type) {
+      card.classList.add('selected');
+      chk.style.cssText = 'width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:none;';
+      chk.textContent = '✓';
+    } else {
+      card.classList.remove('selected');
+      chk.style.cssText = 'width:22px;height:22px;border-radius:50%;border:1.5px solid var(--gray-300);flex-shrink:0;';
+      chk.textContent = '';
+    }
+  });
+
+  // 자동으로 리포트 화면으로
+  setTimeout(() => {
+    buildReport(type);
+    goToScreen(6);
+  }, 500);
+}
+
+// S6: 리포트 빌드
+function countUp(id, target, duration) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = performance.now();
+  function update(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(target * ease).toLocaleString();
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+function buildReport(type) {
+  const isFull = type === 'full';
+  const monthly = isFull ? 27000 : 42000;
+  const after = isFull ? 123000 : 108000;
+  const barPct = isFull ? 88 : 72;
+
+  // 타이틀
+  document.getElementById('wow-emoji').textContent = '🎉';
+  document.getElementById('wow-title').innerHTML = isFull
+    ? '월 27,000원 절약하면서<br>보장이 더 넓어졌어요'
+    : '월 42,000원을<br>절약했어요';
+  document.getElementById('wow-3yr-text').textContent = Math.round(monthly * 36 / 10000) + '만원';
+  document.getElementById('wow-total').textContent = after.toLocaleString() + '원';
+
+  // 카운트업 애니메이션
+  setTimeout(() => {
+    countUp('c-monthly', monthly, 1200);
+    countUp('c-yearly', Math.round(monthly * 12 / 10000), 1400);
+    countUp('c-3yr', Math.round(monthly * 36 / 10000), 1600);
+  }, 300);
+
+  // 보장 바 애니메이션
+  setTimeout(() => {
+    document.getElementById('wow-v').style.width = barPct + '%';
+    document.getElementById('wow-g').style.width = (100 - barPct) + '%';
+  }, 400);
+
+  // 알럿
+  document.getElementById('wow-alert-text').innerHTML = isFull
+    ? '<strong>유효 보장 88%</strong><br>중복 낭비 제거 + 사망 보장 신규 추가'
+    : '<strong>유효 보장 72%</strong><br>중복 낭비 제거 완료';
+
+  // 리포트
+  document.getElementById('report-plan-name').textContent = isFull ? '낭비 제거 + 공백 보완' : '낭비 제거만';
+
+  const actions = isFull
+    ? ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)', '✅ 정기보험 신규 가입 (월 +15,000원)', '✅ 이직 후 단체보험 전환 신청']
+    : ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)'];
+
+  document.getElementById('report-actions').innerHTML = actions
+    .map(a => `<div style="font-size:13px;color:var(--gray-800);padding:8px 10px;background:#fff;border-radius:8px;">${a}</div>`).join('');
+
+
+}
+
+
+</script>
+</body>
+</html>
