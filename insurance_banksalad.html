@@ -714,7 +714,7 @@ function goToScreen(n) {
   if (n === 2) startScan();
   if (n === 3) setupS3();
   if (n === 4) setupS4();
-  if (n === 5) resetPlanSelection();
+  if (n === 5) setupS5();
   if (n === 6) {
     document.getElementById('bottom-bar').style.display = 'none';
     document.getElementById('bottom-bar-s6').style.display = 'block';
@@ -861,6 +861,52 @@ function setupS4() {
 }
 
 // S5: 플랜 선택
+function setupS5() {
+  resetPlanSelection();
+  if (situation === '재직') {
+    // 계획 없음 — 낭비 제거 / 현상 유지
+    document.querySelector('#pc-full .plan-tag').style.background = '#4FAD5D';
+    document.querySelector('#pc-full .plan-title').textContent = '낭비 제거';
+    document.querySelector('#pc-full .plan-sub').textContent = '갱신형 특약 제거로 중복 낭비 해소';
+    const chips1 = document.querySelectorAll('#pc-full .plan-chip');
+    chips1[0].textContent = '월 -42,000원';
+    chips1[0].style.background = '#DFF6E3';
+    chips1[0].style.color = '#4FAD5D';
+    if (chips1[1]) { chips1[1].textContent = '보장 유지'; chips1[1].style.background = '#F1F3F5'; chips1[1].style.color = '#6C757D'; }
+
+    document.querySelector('#pc-waste .plan-tag').style.background = '#E9ECEF';
+    document.querySelector('#pc-waste .plan-tag').style.color = '#6C757D';
+    document.querySelector('#pc-waste .plan-title').textContent = '현상 유지';
+    document.querySelector('#pc-waste .plan-sub').textContent = '지금 보험 구조 그대로 유지';
+    const chips2 = document.querySelectorAll('#pc-waste .plan-chip');
+    chips2[0].textContent = '변동 없음';
+    chips2[0].style.background = '#F1F3F5';
+    chips2[0].style.color = '#6C757D';
+    if (chips2[1]) chips2[1].style.display = 'none';
+  } else {
+    // 이직 계획 있음 — 두 문제 동시 해결 / 낭비만 제거
+    document.querySelector('#pc-full .plan-tag').style.background = '#00C896';
+    document.querySelector('#pc-full .plan-tag').style.color = '#fff';
+    document.querySelector('#pc-full .plan-title').textContent = '두 문제 동시에 해결';
+    document.querySelector('#pc-full .plan-sub').textContent = '낭비 제거 + 이직 후 공백 보완까지';
+    const chips1 = document.querySelectorAll('#pc-full .plan-chip');
+    chips1[0].textContent = '월 -27,000원';
+    chips1[0].style.background = 'var(--green-light)';
+    chips1[0].style.color = 'var(--green-dark)';
+    if (chips1[1]) { chips1[1].textContent = '보장 확대'; chips1[1].style.display = 'inline-block'; chips1[1].style.background = 'var(--green-light)'; chips1[1].style.color = 'var(--green-dark)'; }
+
+    document.querySelector('#pc-waste .plan-tag').style.background = '#E9ECEF';
+    document.querySelector('#pc-waste .plan-tag').style.color = '#6C757D';
+    document.querySelector('#pc-waste .plan-title').textContent = '일단 낭비만 제거';
+    document.querySelector('#pc-waste .plan-sub').textContent = '지금 낭비만 없애고, 공백은 이직 후에';
+    const chips2 = document.querySelectorAll('#pc-waste .plan-chip');
+    chips2[0].textContent = '월 -42,000원';
+    chips2[0].style.background = 'var(--green-light)';
+    chips2[0].style.color = 'var(--green-dark)';
+    if (chips2[1]) { chips2[1].textContent = '공백은 나중에'; chips2[1].style.display = 'inline-block'; chips2[1].style.background = 'var(--gray-100)'; chips2[1].style.color = 'var(--gray-600)'; }
+  }
+}
+
 function resetPlanSelection() {
   ['full','waste'].forEach(t => {
     const card = document.getElementById('pc-' + t);
@@ -914,17 +960,26 @@ function countUp(id, target, duration) {
 }
 
 function buildReport(type) {
+  const isJikjang = situation === '재직';
   const isFull = type === 'full';
-  const monthly = isFull ? 27000 : 42000;
-  const after = isFull ? 123000 : 108000;
+  // 재직/계획없음: full=낭비제거(-42k), waste=현상유지(0)
+  // 이직계획있음: full=낭비+공백(-27k), waste=낭비만(-42k)
+  const monthly = isJikjang ? (isFull ? 42000 : 0) : (isFull ? 27000 : 42000);
+  const after = isJikjang ? (isFull ? 108000 : 150000) : (isFull ? 123000 : 108000);
   const barPct = isFull ? 88 : 72;
 
   // 타이틀
   document.getElementById('wow-emoji').textContent = '🎉';
-  document.getElementById('wow-title').innerHTML = isFull
-    ? '월 27,000원 절약하면서<br>보장이 더 넓어졌어요'
-    : '월 42,000원을<br>절약했어요';
-  document.getElementById('wow-3yr-text').textContent = Math.round(monthly * 36 / 10000) + '만원';
+  if (isJikjang) {
+    document.getElementById('wow-title').innerHTML = isFull
+      ? '월 42,000원을<br>절약했어요'
+      : '현재 플랜을<br>유지합니다';
+  } else {
+    document.getElementById('wow-title').innerHTML = isFull
+      ? '월 27,000원 절약하면서<br>보장이 더 넓어졌어요'
+      : '월 42,000원을<br>절약했어요';
+  }
+  document.getElementById('wow-3yr-text').textContent = monthly > 0 ? Math.round(monthly * 36 / 10000) + '만원' : '변동 없음';
   document.getElementById('wow-total').textContent = after.toLocaleString() + '원';
 
   // 카운트업 애니메이션
@@ -946,11 +1001,19 @@ function buildReport(type) {
     : '<strong>유효 보장 72%</strong><br>중복 낭비 제거 완료';
 
   // 리포트
-  document.getElementById('report-plan-name').textContent = isFull ? '낭비 제거 + 공백 보완' : '낭비 제거만';
+  if (isJikjang) {
+    document.getElementById('report-plan-name').textContent = isFull ? '낭비 제거' : '현상 유지';
+  } else {
+    document.getElementById('report-plan-name').textContent = isFull ? '낭비 제거 + 공백 보완' : '낭비 제거만';
+  }
 
-  const actions = isFull
-    ? ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)', '✅ 정기보험 신규 가입 (월 +15,000원)', '✅ 이직 후 단체보험 전환 신청']
-    : ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)'];
+  const actions = isJikjang
+    ? (isFull
+        ? ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)']
+        : ['현재 보험 구조를 유지합니다'])
+    : (isFull
+        ? ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)', '✅ 정기보험 신규 가입 (월 +15,000원)', '✅ 이직 후 단체보험 전환 신청']
+        : ['✅ 한화생명 입원의료비 특약 제거 (월 -42,000원)']);
 
   document.getElementById('report-actions').innerHTML = actions
     .map(a => `<div style="font-size:13px;color:var(--gray-800);padding:8px 10px;background:#fff;border-radius:8px;">${a}</div>`).join('');
